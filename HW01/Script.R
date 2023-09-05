@@ -5,38 +5,22 @@
 options(width=120, digits=8, scipen=9, show.signif.stars=FALSE)
 
 #####  Check to see if packages are downloaded, install if not, then load  #####
+# if (!require("readxl")) install.packages("readxl")
 
-if (!require("readxl")) install.packages("readxl")
-library(readxl) # To import xls or xlsx data as table
-
-if (!require("psych")) install.packages("psych")
 library(psych) # To add summary functions
-
-if (!require("lme4")) install.packages("lme4")
 library(lme4) # To estimate MLMs using lmer
-
-if (!require("lmerTest")) install.packages("lmerTest")
 library(lmerTest) # To get Satterthwaite DDF in lmer
-
-if (!require("performance")) install.packages("performance")
 library(performance) # To get ICC using lmer
 
-if (!require("TeachingDemos")) install.packages("TeachingDemos")
-library(TeachingDemos) # To create text output files
+# Load Jonathan's custom R functions from folder within working directory
+functions = paste0("R functions/",dir("R functions/"))
+temp = lapply(X=functions, FUN=source)
 
 # Clear workspace (re-run as needed for troubleshooting purposes)
 #rm(list = ls())
 
-###########################################################################
-# Define variables for working directory and data name -- CHANGE THESE
-filesave = "C:\\Dropbox/23_PSQF6272hw/HW01/data/"
-filename = "HW01_11111111.xlsx"
-setwd(dir=filesave)
-
-# Import homework data
-HW01 = read_excel(paste0(filesave,filename)) 
-# Convert to data frame to use in analysis
-HW01 = as.data.frame(HW01)
+# Data
+dat1 <- data.frame(readxl::read_excel("HW01/HW01_01445225.xlsx"))
 
 # Here are the labels (not to be included in data used in lmer)
 #SiteID=    "SiteID: Site ID number"
@@ -47,9 +31,48 @@ HW01 = as.data.frame(HW01)
 #anxiety=   "anxiety: Post-Test Anxiety Outcome"
 
 # Your code to create or center predictors goes here
-
-
-# Open external file to save results to -- turn off to use console instead
-txtStart(file="PSQF6272_HW01_Output.txt")
+dat1$Treat_B <- dat1$treattype - 1
+dat1$YexpLead_5 <- dat1$yrsexp - 5
+dat1$Site_Urban <- dat1$sitetype - 1
 
 # Your code to estimate models goes here
+
+## Section 1
+m0 <- lmer(formula = anxiety ~ 1 + (1|SiteID),
+           REML = T,
+           data = dat1)
+llikAIC(m0, chkREML=FALSE); summary(m0, ddf="Satterthwaite")
+icc(m0); ranova(m0)
+
+summary(m0, ddf="Satterthwaite")$coef[1] - 1.96 * data.frame(VarCorr(m0))[1,5]
+summary(m0, ddf="Satterthwaite")$coef[1] + 1.96 * data.frame(VarCorr(m0))[1,5]
+
+## Section 2
+m1 <- lmer(formula = anxiety ~ 1 + YexpLead_5 + Site_Urban + (1|SiteID),
+           REML = T,
+           data = dat1)
+
+llikAIC(m1, chkREML=FALSE); summary(m1, ddf="Satterthwaite")
+contestMD(m1, ddf="Satterthwaite", L=rbind(c(0,1,0),c(0,0,1)))
+pseudoRSquaredinator(smallerModel=m0, largerModel=m1)
+totalRSquaredinator(model=m1, dvName="anxiety", data=dat1)
+
+## Section 3
+m2 <- lmer(formula = anxiety ~ 1 + YexpLead_5 + Site_Urban * Treat_B + (1|SiteID),
+           REML = T,
+           data = dat1)
+llikAIC(m2, chkREML=FALSE); summary(m2, ddf="Satterthwaite")
+contestMD(m2, ddf="Satterthwaite", L=rbind(c(0,1,0,0,0),c(0,0,1,0,0),c(0,0,0,1,0),c(0,0,0,0,1)))
+icc(m2); ranova(m2)
+pseudoRSquaredinator(smallerModel=m0, largerModel=m2)
+totalRSquaredinator(model=m2, dvName="anxiety", data=dat1)
+contest1D(m2, ddf="Satterthwaite", L=rbind(c(0,0,0,1,1)))
+
+
+
+
+
+
+
+
+
